@@ -5,7 +5,7 @@ import json
 import base64
 
 # ================= 页面配置 =================
-st.set_page_config(page_title="TikTok Shop 爆款标题优化工具", layout="wide", page_icon="🛍️")
+st.set_page_config(page_title="TikTok Shop 标题优化工具", layout="wide", page_icon="🛍️")
 st.title("🛍️ TikTok Shop 爆款标题优化工具 (云端版)")
 
 # ================= 侧边栏配置 (全局设置) =================
@@ -14,9 +14,20 @@ with st.sidebar:
     api_key = st.text_input("OpenRouter API Key", type="password", help="请输入你的 OpenRouter API Key")
     
     # 常用支持视觉的模型列表
+    # 常用支持视觉的模型列表 (已加入最新及预留模型)
     model_choice = st.selectbox(
-        "选择 AI 模型 (必须支持图片)", 
-        ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "google/gemini-1.5-pro"]
+        "选择 AI 模型", 
+        [
+            "anthropic/claude-3.5-sonnet", 
+            "openai/gpt-4o", 
+            "google/gemini-1.5-pro",
+            "google/gemini-3-flash-preview",
+            "google/gemini-3.1-pro-preview",
+            "google/gemini-2.5-flash",
+            "openai/gpt-5.4",
+            "google/gemini-2.0-flash-001",
+            "openai/gpt-5-chat"
+        ]
     )
 
 # ================= 主区域输入 (商品信息) =================
