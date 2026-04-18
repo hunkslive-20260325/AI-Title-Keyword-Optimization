@@ -2,32 +2,27 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-import random
 
 # ================= 页面配置 =================
-st.set_page_config(page_title="TikTok Shop 爆款标题优化工具", layout="wide", page_icon="🛍️")
-st.title("🛍️ TikTok Shop 爆款标题优化工具 (纯文本极速版)")
+st.set_page_config(page_title="TikTok Shop 标题精细化优化器", layout="wide", page_icon="🎯")
+st.title("🎯 TikTok Shop 标题精细化优化器 (深度诊断版)")
 
-# ================= 侧边栏配置 (全局设置) =================
+# ================= 侧边栏配置 =================
 with st.sidebar:
     st.header("⚙️ 基础配置")
     api_key = st.text_input("OpenRouter API Key", type="password", help="请输入你的 OpenRouter API Key")
     
-    # 因为不需要图片了，推荐使用速度更快、成本极低的文本/轻量模型
+    # 推荐使用逻辑推理能力较强的模型，因为需要做分析匹配
     model_choice = st.selectbox(
         "选择 AI 模型", 
         [
-            "google/gemini-2.5-flash",        # 强烈推荐，性价比极高
-            "openai/gpt-4o-mini",             # 便宜且聪明
-            "anthropic/claude-3-haiku",       # 速度极快
-            "google/gemini-1.5-pro",
-            "openai/gpt-4o",
-            "google/gemini-3.1-pro-preview"
+            "openai/gpt-4o",                  # 逻辑分析最强，首选
+            "anthropic/claude-3.5-sonnet",    # 极其擅长文本细腻度和合规
+            "google/gemini-1.5-pro",          # 综合能力强
+            "google/gemini-2.5-flash",        # 性价比极高
+            "openai/gpt-4o-mini"
         ]
     )
-    
-    sample_size = st.slider("每次抽取的关键词数量", min_value=10, max_value=100, value=40, step=10, 
-                            help="从你上传的 Excel 中随机抽取的关键词数量喂给 AI。不建议超过100，避免 AI 注意力分散。")
 
 # ================= 主区域输入 (商品信息) =================
 st.header("📦 商品基本信息")
@@ -45,59 +40,69 @@ with col_info3:
 
 st.divider()
 
-# ================= 上传区域 (仅关键词) =================
-st.subheader("📊 上传热度关键词库")
-uploaded_excel = st.file_uploader("上传包含上千个关键词的 Excel 文件 (.xlsx)", type=["xlsx"])
+# ================= 上传区域 (精准十词) =================
+st.subheader("📊 上传精准关键词 (推荐 10 个左右)")
+uploaded_excel = st.file_uploader("上传 Excel 文件 (.xlsx)", type=["xlsx"])
 all_keywords = []
 
 if uploaded_excel:
     try:
-        # 读取 Excel，假设关键词在第一列
         df = pd.read_excel(uploaded_excel)
-        # 清理空值并转换为字符串列表
-        all_keywords = df.iloc[:, 0].dropna().astype(str).tolist()
-        st.success(f"✅ 成功加载本地词库！共读取到 **{len(all_keywords)}** 个关键词。")
-        with st.expander("预览词库前 10 个词"):
-            st.write(", ".join(all_keywords[:10]))
+        # 提取第一列，最多取前 15 个，防止用户不小心传太多
+        all_keywords = df.iloc[:, 0].dropna().astype(str).tolist()[:15]
+        st.success(f"✅ 成功加载 **{len(all_keywords)}** 个待分析关键词。")
+        st.write("待分析列表：", ", ".join(all_keywords))
     except Exception as e:
         st.error(f"读取 Excel 失败: {e}")
 
 st.divider()
 
 # ================= 核心处理逻辑 =================
-def generate_titles(api_key, model, original_title, category, quantity, keywords_list):
+def analyze_and_generate(api_key, model, original_title, category, quantity, keywords_list):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
-    # 纯文本的 Prompt 提示词
+    # 全新的二段式 Prompt：分析 + 生成
     system_prompt = f"""
-    你是一个资深的 TikTok Shop 跨境电商标题优化专家。请根据提供的原始标题、饰品类别、商品数量以及本轮抽取的热搜关键词，生成5个具备爆单潜力的全新商品标题。
+    你是一个资深的 TikTok Shop 跨境电商标题优化专家与数据分析师。
     
     【商品基础信息】
     - 饰品类别：{category}
     - 原始标题：{original_title}
-    - 商品数量：{quantity}件 （如果数量>1，请务必在标题英文中自然体现，如 "{quantity} Pcs", "Set of {quantity}" 等）
+    - 商品数量：{quantity}件
     
-    【合规与优化要求（至关重要）】
-    1. 严格遵守 TikTok Shop 商品上架规则。
-    2. 绝对禁止侵权词汇（如大牌名称的变体、仿冒暗示）。
-    3. 绝对禁止虚假宣传（如无证据的“100%纯金”、“包治百病”等）。
-    4. 标题需符合东南亚和欧美用户的搜索习惯。
-    5. 在保留原标题核心属性的基础上，巧妙、自然地融入提供的热搜关键词。
+    【任务指令】
+    请按照以下两个步骤执行任务：
+    
+    **第一步：关键词逐个诊断**
+    分析用户提供的每一个关键词，判断其与当前商品的匹配度（高、中、低），并给出简短的理由（比如：该词是场景词，非常契合；或该词是竞品材质，存在虚假宣传风险，不建议使用等）。
+    
+    **第二步：爆款标题合成**
+    结合商品原标题，**仅挑选第一步中匹配度为“高”或“中”的关键词**，生成5个符合 TikTok 平台规则、具备爆单潜力的英文标题。并明确列出每个标题成功融入了哪些关键词。
     
     【输出格式要求】
-    你必须**只返回一个严格的 JSON 数组**，不要包含任何额外的Markdown标记（如 ```json）或解释文字。格式如下：
-    [
-      {{
-        "en_title": "英文标题",
-        "zh_title": "中文翻译",
-        "score": 爆单潜力分数(0-100的整数),
-        "reason": "推荐理由(50字以内)"
-      }}
-    ]
+    你必须**只返回一个严格的 JSON 对象**，不要包含任何额外的Markdown标记（如 ```json）或解释文字。格式必须如下：
+    {{
+      "keyword_analysis": [
+        {{
+          "keyword": "关键词",
+          "match_level": "高/中/低",
+          "analysis": "匹配理由(20字以内)"
+        }}
+      ],
+      "generated_titles": [
+        {{
+          "en_title": "英文标题",
+          "zh_title": "中文翻译",
+          "used_keywords": ["引用的关键词1", "引用的关键词2"],
+          "score": 爆单潜力分数(0-100的整数),
+          "reason": "推荐理由(50字以内)"
+        }}
+      ]
+    }}
     """
     
     payload = {
@@ -109,7 +114,7 @@ def generate_titles(api_key, model, original_title, category, quantity, keywords
             },
             {
                 "role": "user",
-                "content": f"本轮供你使用的热搜关键词：{', '.join(keywords_list)}"
+                "content": f"本次需要诊断并使用的热搜关键词列表：{', '.join(keywords_list)}"
             }
         ]
     }
@@ -119,44 +124,64 @@ def generate_titles(api_key, model, original_title, category, quantity, keywords
     return response.json()['choices'][0]['message']['content']
 
 # ================= 触发生成 =================
-if st.button("🚀 开始生成爆款标题 (每次点击都会随机融入不同关键词)", type="primary", use_container_width=True):
+if st.button("🔍 开启深度诊断与标题生成", type="primary", use_container_width=True):
     if not api_key:
         st.warning("请先在左侧侧边栏输入 OpenRouter API Key！")
     elif not original_title:
-        st.warning("请填写原始商品标题（因为没有图片了，AI 必须依赖原标题来知道商品是什么）！")
+        st.warning("请填写原始商品标题，以便 AI 评估关键词匹配度！")
     elif not all_keywords:
-        st.warning("请先上传有效的关键词 Excel 文件！")
+        st.warning("请先上传包含关键词的 Excel 文件！")
     else:
-        # 核心优化：动态随机抽取关键词
-        current_sample_size = min(sample_size, len(all_keywords))
-        sampled_keywords = random.sample(all_keywords, current_sample_size)
-        
-        st.info(f"🎲 正在从词库中随机抽取 **{current_sample_size}** 个词： {', '.join(sampled_keywords[:5])}...")
-        
-        with st.spinner("AI 正在深度重组标题，马上就好..."):
+        with st.spinner("AI 正在逐个解剖关键词，并深度重组标题，请稍候..."):
             try:
-                result_text = generate_titles(
-                    api_key, model_choice, original_title, category, quantity, sampled_keywords
+                result_text = analyze_and_generate(
+                    api_key, model_choice, original_title, category, quantity, all_keywords
                 )
                 
-                # 清理返回结果可能带有的 Markdown 格式
+                # 清理格式
                 result_text = result_text.strip().removeprefix('```json').removesuffix('```').strip()
+                result_data = json.loads(result_text)
                 
-                # 解析 JSON 并排序
-                titles_data = json.loads(result_text)
-                sorted_titles = sorted(titles_data, key=lambda x: x['score'], reverse=True)
+                # ================= 展示第一部分：关键词诊断 =================
+                st.subheader("🩺 第一步：关键词深度诊断报告")
+                analysis_list = result_data.get("keyword_analysis", [])
+                if analysis_list:
+                    # 将 JSON 数据转换为 Pandas DataFrame 方便以表格形式展示
+                    df_analysis = pd.DataFrame(analysis_list)
+                    # 重命名列名以便展示
+                    df_analysis = df_analysis.rename(columns={
+                        "keyword": "关键词", 
+                        "match_level": "匹配度", 
+                        "analysis": "AI 诊断说明"
+                    })
+                    
+                    # 按照匹配度排序展示 (可选)
+                    st.dataframe(df_analysis, use_container_width=True, hide_index=True)
                 
-                st.success("🎉 生成完毕！以下是按爆单潜力分数倒序排列的标题：")
+                st.divider()
                 
-                # 展示结果
+                # ================= 展示第二部分：生成的标题 =================
+                st.subheader("🏆 第二步：根据高匹配度词汇生成的标题")
+                titles_list = result_data.get("generated_titles", [])
+                
+                # 按分数排序
+                sorted_titles = sorted(titles_list, key=lambda x: x['score'], reverse=True)
+                
                 for idx, item in enumerate(sorted_titles):
-                    with st.expander(f"🏆 推荐 #{idx+1} | 潜力评分: {item['score']} 分 | {item['en_title']}", expanded=True):
+                    with st.expander(f"🏅 推荐 #{idx+1} | 潜力评分: {item['score']} 分 | {item['en_title']}", expanded=True):
                         st.markdown(f"**🇺🇸 英文标题:** `{item['en_title']}`")
                         st.markdown(f"**🇨🇳 中文释义:** {item['zh_title']}")
+                        
+                        # 特别展示引用的关键词
+                        used_kws = item.get('used_keywords', [])
+                        if used_kws:
+                            kw_tags = " ".join([f"`🏷️ {kw}`" for kw in used_kws])
+                            st.markdown(f"**🎯 成功引用的关键词:** {kw_tags}")
+                            
                         st.markdown(f"**💡 推荐理由:** {item['reason']}")
                         
             except json.JSONDecodeError:
                 st.error("AI 返回的数据格式有误，未能生成有效的 JSON，请重试。")
-                st.code(result_text) # 显示错误文本以便排查
+                st.code(result_text)
             except Exception as e:
                 st.error(f"发生调用错误: {e}")
