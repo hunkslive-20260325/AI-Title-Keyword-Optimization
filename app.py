@@ -41,15 +41,15 @@ with col_info3:
 st.divider()
 
 # ================= 上传区域 (精准十词) =================
-st.subheader("📊 上传精准关键词 (推荐 10 个左右)")
+st.subheader("📊 上传精准关键词")
 uploaded_excel = st.file_uploader("上传 Excel 文件 (.xlsx)", type=["xlsx"])
 all_keywords = []
 
 if uploaded_excel:
     try:
         df = pd.read_excel(uploaded_excel)
-        # 提取第一列，最多取前 15 个，防止用户不小心传太多
-        all_keywords = df.iloc[:, 0].dropna().astype(str).tolist()[:15]
+        # 提取第一列，最多取前 30 个，防止用户不小心传太多
+        all_keywords = df.iloc[:, 0].dropna().astype(str).tolist()[:30]
         st.success(f"✅ 成功加载 **{len(all_keywords)}** 个待分析关键词。")
         st.write("待分析列表：", ", ".join(all_keywords))
     except Exception as e:
