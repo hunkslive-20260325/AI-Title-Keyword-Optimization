@@ -18,7 +18,7 @@ with st.sidebar:
         [
             "openai/gpt-4o",                # 逻辑最稳，首选
             "anthropic/claude-3.5-sonnet",    # 文案极其自然
-            "google/gemini-2.0-flash",       # 响应极快
+            "google/gemini-2.5-flash",       # 响应极快
             "openai/gpt-4o-mini"
         ]
     )
